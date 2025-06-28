@@ -105,16 +105,21 @@ jobs:
         run: |
           echo "Starting backend test performance measurement..."
           
-          # Measure test execution time for each test suite
+          # Measure test execution time for a subset of faster test suites
+          # These are typically faster and provide good baseline metrics
+          # 
+          # OPTIONS:
+          # - Fast subset (current): data:test, security:test (~2-5 minutes)
+          # - Comprehensive: server-app:runContextRecreatingTests, server-app:runStandardTests, 
+          #   server-app:runWebsocketTests, data:test, security:test (~10-20 minutes)
+          # - Single test: data:test (~1-2 minutes)
           test_suites=(
-            "server-app:runContextRecreatingTests"
-            "server-app:runStandardTests"
-            "server-app:runWebsocketTests"
             "data:test"
             "security:test"
           )
           
-          test_results="{}"
+          # Initialize JSON array for test results
+          echo '[]' > performance-results/test-results-temp.json
           total_test_time=0
           
           for test_suite in "${test_suites[@]}"; do
@@ -128,10 +133,18 @@ jobs:
             # Extract test count and results
             test_output=$(./gradlew $test_suite --no-daemon --parallel 2>&1 | grep -E "(tests|passed|failed|skipped)" | tail -1 || echo "No test output found")
             
-            test_results=$(echo $test_results | jq --arg suite "$test_suite" --arg time "$test_time" --arg output "$test_output" '. + {($suite): {"time": $time, "output": $output}}')
+            # Add test result to JSON array
+            jq --arg suite "$test_suite" --arg time "$test_time" --arg output "$test_output" \
+               '. += [{"suite": $suite, "time": $time, "output": $output}]' \
+               performance-results/test-results-temp.json > performance-results/test-results-temp2.json
+            mv performance-results/test-results-temp2.json performance-results/test-results-temp.json
           done
           
-          echo "backend_test_results='$test_results'" >> $GITHUB_OUTPUT
+          # Read the final JSON and set output
+          test_results=$(cat performance-results/test-results-temp.json)
+          echo "backend_test_results<<EOF" >> $GITHUB_OUTPUT
+          echo "$test_results" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "backend_total_test_time=$total_test_time" >> $GITHUB_OUTPUT
           
           # Save detailed test metrics
@@ -144,6 +157,9 @@ jobs:
             "test_suites": $test_results
           }
           EOF
+          
+          # Clean up temp file
+          rm -f performance-results/test-results-temp.json
 
       # Frontend Performance Metrics
       - name: Measure frontend build performance
