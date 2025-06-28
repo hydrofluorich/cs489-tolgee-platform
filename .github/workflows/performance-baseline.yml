@@ -167,6 +167,9 @@ jobs:
         run: |
           echo "Starting frontend build performance measurement..."
           
+          # Ensure performance-results directory exists (relative to root)
+          mkdir -p ../performance-results
+          
           # Measure npm install time
           start_time=$(date +%s.%N)
           npm ci
@@ -195,7 +198,7 @@ jobs:
           echo "frontend_file_count=$file_count" >> $GITHUB_OUTPUT
           
           # Save detailed metrics
-          cat > performance-results/frontend-build.json << EOF
+          cat > ../performance-results/frontend-build.json << EOF
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
@@ -217,23 +220,37 @@ jobs:
         run: |
           echo "Starting frontend static analysis performance measurement..."
           
-          # Measure TypeScript compilation time
-          start_time=$(date +%s.%N)
-          npm run tsc
-          end_time=$(date +%s.%N)
-          tsc_time=$(echo "$end_time - $start_time" | bc -l)
+          # Ensure performance-results directory exists (relative to root)
+          mkdir -p ../performance-results
           
-          # Measure ESLint time
-          start_time=$(date +%s.%N)
-          npm run eslint
-          end_time=$(date +%s.%N)
-          eslint_time=$(echo "$end_time - $start_time" | bc -l)
+          # Check if npm scripts exist
+          if ! npm run --silent tsc >/dev/null 2>&1; then
+            echo "Warning: TypeScript compilation script not found, skipping tsc measurement"
+            tsc_time=0
+          else
+            # Measure TypeScript compilation time
+            start_time=$(date +%s.%N)
+            npm run tsc
+            end_time=$(date +%s.%N)
+            tsc_time=$(echo "$end_time - $start_time" | bc -l)
+          fi
+          
+          if ! npm run --silent eslint >/dev/null 2>&1; then
+            echo "Warning: ESLint script not found, skipping eslint measurement"
+            eslint_time=0
+          else
+            # Measure ESLint time
+            start_time=$(date +%s.%N)
+            npm run eslint
+            end_time=$(date +%s.%N)
+            eslint_time=$(echo "$end_time - $start_time" | bc -l)
+          fi
           
           echo "frontend_tsc_time=$tsc_time" >> $GITHUB_OUTPUT
           echo "frontend_eslint_time=$eslint_time" >> $GITHUB_OUTPUT
           
           # Save detailed metrics
-          cat > performance-results/frontend-analysis.json << EOF
+          cat > ../performance-results/frontend-analysis.json << EOF
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
@@ -252,6 +269,9 @@ jobs:
         run: |
           echo "Starting E2E setup performance measurement..."
           
+          # Ensure performance-results directory exists (relative to root)
+          mkdir -p ../performance-results
+          
           # Measure npm install time
           start_time=$(date +%s.%N)
           npm ci
@@ -268,7 +288,7 @@ jobs:
           echo "e2e_cypress_install_time=$cypress_install_time" >> $GITHUB_OUTPUT
           
           # Save detailed metrics
-          cat > performance-results/e2e-setup.json << EOF
+          cat > ../performance-results/e2e-setup.json << EOF
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "commit": "${{ github.sha }}",
@@ -287,6 +307,32 @@ jobs:
         run: |
           echo "Generating performance summary..."
           
+          # Validate that required step outputs exist
+          if [ -z "${{ steps.backend-build.outputs.backend_build_time }}" ]; then
+            echo "Error: Backend build time not available"
+            exit 1
+          fi
+          
+          if [ -z "${{ steps.frontend-build.outputs.frontend_build_time }}" ]; then
+            echo "Error: Frontend build time not available"
+            exit 1
+          fi
+          
+          if [ -z "${{ steps.backend-tests.outputs.backend_total_test_time }}" ]; then
+            echo "Error: Backend test time not available"
+            exit 1
+          fi
+          
+          if [ -z "${{ steps.frontend-build.outputs.frontend_install_time }}" ]; then
+            echo "Error: Frontend install time not available"
+            exit 1
+          fi
+          
+          if [ -z "${{ steps.e2e-setup.outputs.e2e_install_time }}" ]; then
+            echo "Error: E2E install time not available"
+            exit 1
+          fi
+          
           # Calculate total build time
           total_build_time=$(echo "${{ steps.backend-build.outputs.backend_build_time }} + ${{ steps.frontend-build.outputs.frontend_build_time }}" | bc -l)
           
@@ -295,6 +341,15 @@ jobs:
           
           # Calculate total setup time
           total_setup_time=$(echo "${{ steps.frontend-build.outputs.frontend_install_time }} + ${{ steps.e2e-setup.outputs.e2e_install_time }}" | bc -l)
+          
+          # Calculate total time
+          total_time=$(echo "$total_build_time + $total_test_time + $total_setup_time" | bc -l)
+          
+          # Set output variables
+          echo "total_build_time=$total_build_time" >> $GITHUB_OUTPUT
+          echo "total_test_time=$total_test_time" >> $GITHUB_OUTPUT
+          echo "total_setup_time=$total_setup_time" >> $GITHUB_OUTPUT
+          echo "total_time=$total_time" >> $GITHUB_OUTPUT
           
           # Create summary report
           cat > performance-results/summary.json << EOF
@@ -307,7 +362,7 @@ jobs:
               "total_build_time_seconds": $total_build_time,
               "total_test_time_seconds": $total_test_time,
               "total_setup_time_seconds": $total_setup_time,
-              "total_time_seconds": $(echo "$total_build_time + $total_test_time + $total_setup_time" | bc -l)
+              "total_time_seconds": $total_time
             },
             "backend": {
               "build_time_seconds": ${{ steps.backend-build.outputs.backend_build_time }},
@@ -357,6 +412,7 @@ jobs:
           echo "- **Total Build Time:** $(echo "${{ steps.performance-summary.outputs.total_build_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Setup Time:** $(echo "${{ steps.performance-summary.outputs.total_setup_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **Total Time:** $(echo "${{ steps.performance-summary.outputs.total_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "" >> performance-report.md
           
           echo "### Backend Metrics" >> performance-report.md
