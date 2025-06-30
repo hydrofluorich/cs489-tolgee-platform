@@ -192,32 +192,27 @@ jobs:
           # Ensure performance-results directory exists (relative to root)
           mkdir -p ../performance-results
           
-          # Measure npm install time
+          # Measure frontend build with resource usage
           start_time=$(date +%s.%N)
-          npm ci
+          /usr/bin/time -v npm ci 2> frontend_install_time.txt
           end_time=$(date +%s.%N)
           install_time=$(echo "$end_time - $start_time" | bc -l)
+          install_max_mem=$(grep "Maximum resident set size" frontend_install_time.txt | awk '{print $6}')
+          install_cpu_percent=$(grep "Percent of CPU this job got" frontend_install_time.txt | awk '{print $8}')
           
-          # Measure build time
           start_time=$(date +%s.%N)
-          npm run build
+          /usr/bin/time -v npm run build 2> frontend_build_time.txt
           end_time=$(date +%s.%N)
           build_time=$(echo "$end_time - $start_time" | bc -l)
-          
-          # Measure bundle sizes
-          total_size=$(du -sb dist | cut -f1)
-          js_size=$(find dist -name "*.js" -exec du -sb {} + | awk '{sum += $1} END {print sum+0}')
-          css_size=$(find dist -name "*.css" -exec du -sb {} + | awk '{sum += $1} END {print sum+0}')
-          
-          # Count files
-          file_count=$(find dist -type f | wc -l)
+          build_max_mem=$(grep "Maximum resident set size" frontend_build_time.txt | awk '{print $6}')
+          build_cpu_percent=$(grep "Percent of CPU this job got" frontend_build_time.txt | awk '{print $8}')
           
           echo "frontend_install_time=$install_time" >> $GITHUB_OUTPUT
+          echo "frontend_install_max_mem_kb=$install_max_mem" >> $GITHUB_OUTPUT
+          echo "frontend_install_cpu_percent=$install_cpu_percent" >> $GITHUB_OUTPUT
           echo "frontend_build_time=$build_time" >> $GITHUB_OUTPUT
-          echo "frontend_total_size=$total_size" >> $GITHUB_OUTPUT
-          echo "frontend_js_size=$js_size" >> $GITHUB_OUTPUT
-          echo "frontend_css_size=$css_size" >> $GITHUB_OUTPUT
-          echo "frontend_file_count=$file_count" >> $GITHUB_OUTPUT
+          echo "frontend_build_max_mem_kb=$build_max_mem" >> $GITHUB_OUTPUT
+          echo "frontend_build_cpu_percent=$build_cpu_percent" >> $GITHUB_OUTPUT
           
           # Save detailed metrics
           cat > ../performance-results/frontend-build.json << EOF
@@ -227,11 +222,11 @@ jobs:
             "branch": "${{ github.ref_name }}",
             "metrics": {
               "install_time_seconds": $install_time,
+              "install_max_memory_kb": $install_max_mem,
+              "install_cpu_percent": $install_cpu_percent,
               "build_time_seconds": $build_time,
-              "total_size_bytes": $total_size,
-              "js_size_bytes": $js_size,
-              "css_size_bytes": $css_size,
-              "file_count": $file_count
+              "build_max_memory_kb": $build_max_mem,
+              "build_cpu_percent": $build_cpu_percent
             }
           }
           EOF
@@ -242,36 +237,42 @@ jobs:
         run: |
           echo "Starting frontend static analysis performance measurement..."
           
-          # Ensure performance-results directory exists (relative to root)
           mkdir -p ../performance-results
           
-          # Check if npm scripts exist
+          # TypeScript
           if ! npm run --silent tsc >/dev/null 2>&1; then
             echo "Warning: TypeScript compilation script not found, skipping tsc measurement"
             tsc_time=0
+            tsc_max_mem=0
+            tsc_cpu_percent=0
           else
-            # Measure TypeScript compilation time
             start_time=$(date +%s.%N)
-            npm run tsc
+            /usr/bin/time -v npm run tsc 2> tsc_time.txt
             end_time=$(date +%s.%N)
             tsc_time=$(echo "$end_time - $start_time" | bc -l)
+            tsc_max_mem=$(grep "Maximum resident set size" tsc_time.txt | awk '{print $6}')
+            tsc_cpu_percent=$(grep "Percent of CPU this job got" tsc_time.txt | awk '{print $8}')
           fi
-          
+          # ESLint
           if ! npm run --silent eslint >/dev/null 2>&1; then
             echo "Warning: ESLint script not found, skipping eslint measurement"
             eslint_time=0
+            eslint_max_mem=0
+            eslint_cpu_percent=0
           else
-            # Measure ESLint time
             start_time=$(date +%s.%N)
-            npm run eslint
+            /usr/bin/time -v npm run eslint 2> eslint_time.txt
             end_time=$(date +%s.%N)
             eslint_time=$(echo "$end_time - $start_time" | bc -l)
+            eslint_max_mem=$(grep "Maximum resident set size" eslint_time.txt | awk '{print $6}')
+            eslint_cpu_percent=$(grep "Percent of CPU this job got" eslint_time.txt | awk '{print $8}')
           fi
-          
           echo "frontend_tsc_time=$tsc_time" >> $GITHUB_OUTPUT
+          echo "frontend_tsc_max_mem_kb=$tsc_max_mem" >> $GITHUB_OUTPUT
+          echo "frontend_tsc_cpu_percent=$tsc_cpu_percent" >> $GITHUB_OUTPUT
           echo "frontend_eslint_time=$eslint_time" >> $GITHUB_OUTPUT
-          
-          # Save detailed metrics
+          echo "frontend_eslint_max_mem_kb=$eslint_max_mem" >> $GITHUB_OUTPUT
+          echo "frontend_eslint_cpu_percent=$eslint_cpu_percent" >> $GITHUB_OUTPUT
           cat > ../performance-results/frontend-analysis.json << EOF
           {
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -279,7 +280,11 @@ jobs:
             "branch": "${{ github.ref_name }}",
             "metrics": {
               "typescript_compilation_time_seconds": $tsc_time,
-              "eslint_time_seconds": $eslint_time
+              "typescript_max_memory_kb": $tsc_max_mem,
+              "typescript_cpu_percent": $tsc_cpu_percent,
+              "eslint_time_seconds": $eslint_time,
+              "eslint_max_memory_kb": $eslint_max_mem,
+              "eslint_cpu_percent": $eslint_cpu_percent
             }
           }
           EOF
@@ -384,7 +389,8 @@ jobs:
               "total_build_time_seconds": $total_build_time,
               "total_test_time_seconds": $total_test_time,
               "total_setup_time_seconds": $total_setup_time,
-              "total_time_seconds": $total_time
+              "total_time_seconds": $total_time,
+              "latency_percentiles": ${{ steps.backend-tests.outputs.backend_test_results }}
             },
             "backend": {
               "build_time_seconds": ${{ steps.backend-build.outputs.backend_build_time }},
@@ -392,21 +398,22 @@ jobs:
               "cpu_percent": ${{ steps.backend-build.outputs.backend_build_cpu_percent }},
               "user_time_seconds": ${{ steps.backend-build.outputs.backend_build_user_time }},
               "sys_time_seconds": ${{ steps.backend-build.outputs.backend_build_sys_time }},
-              "total_test_time_seconds": $total_test_time
+              "total_test_time_seconds": $total_test_time,
+              "latency_percentiles": ${{ steps.backend-tests.outputs.backend_test_results }}
             },
             "frontend": {
               "install_time_seconds": ${{ steps.frontend-build.outputs.frontend_install_time }},
+              "install_max_memory_kb": ${{ steps.frontend-build.outputs.frontend_install_max_mem_kb }},
+              "install_cpu_percent": ${{ steps.frontend-build.outputs.frontend_install_cpu_percent }},
               "build_time_seconds": ${{ steps.frontend-build.outputs.frontend_build_time }},
-              "total_size_bytes": ${{ steps.frontend-build.outputs.frontend_total_size }},
-              "js_size_bytes": ${{ steps.frontend-build.outputs.frontend_js_size }},
-              "css_size_bytes": ${{ steps.frontend-build.outputs.frontend_css_size }},
-              "file_count": ${{ steps.frontend-build.outputs.frontend_file_count }},
+              "build_max_memory_kb": ${{ steps.frontend-build.outputs.frontend_build_max_mem_kb }},
+              "build_cpu_percent": ${{ steps.frontend-build.outputs.frontend_build_cpu_percent }},
               "tsc_time_seconds": ${{ steps.frontend-analysis.outputs.frontend_tsc_time }},
-              "eslint_time_seconds": ${{ steps.frontend-analysis.outputs.frontend_eslint_time }}
-            },
-            "e2e": {
-              "install_time_seconds": ${{ steps.e2e-setup.outputs.e2e_install_time }},
-              "cypress_install_time_seconds": ${{ steps.e2e-setup.outputs.e2e_cypress_install_time }}
+              "tsc_max_memory_kb": ${{ steps.frontend-analysis.outputs.frontend_tsc_max_mem_kb }},
+              "tsc_cpu_percent": ${{ steps.frontend-analysis.outputs.frontend_tsc_cpu_percent }},
+              "eslint_time_seconds": ${{ steps.frontend-analysis.outputs.frontend_eslint_time }},
+              "eslint_max_memory_kb": ${{ steps.frontend-analysis.outputs.frontend_eslint_max_mem_kb }},
+              "eslint_cpu_percent": ${{ steps.frontend-analysis.outputs.frontend_eslint_cpu_percent }}
             }
           }
           EOF
@@ -437,6 +444,10 @@ jobs:
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Setup Time:** $(echo "${{ steps.performance-summary.outputs.total_setup_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Time:** $(echo "${{ steps.performance-summary.outputs.total_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **Latency Percentiles (s):**" >> performance-report.md
+          echo "  - 50th: $(jq -r '.[0].latency_percentiles["50"]' performance-results/backend-tests.json)" >> performance-report.md
+          echo "  - 90th: $(jq -r '.[0].latency_percentiles["90"]' performance-results/backend-tests.json)" >> performance-report.md
+          echo "  - 99th: $(jq -r '.[0].latency_percentiles["99"]' performance-results/backend-tests.json)" >> performance-report.md
           echo "" >> performance-report.md
           
           echo "### Backend Metrics" >> performance-report.md
@@ -446,17 +457,25 @@ jobs:
           echo "- **User Time:** $(echo "${{ steps.backend-build.outputs.backend_build_user_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **System Time:** $(echo "${{ steps.backend-build.outputs.backend_build_sys_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **Latency Percentiles (s):**" >> performance-report.md
+          echo "  - 50th: $(jq -r '.latency_percentiles["50"]' performance-results/backend-tests.json)" >> performance-report.md
+          echo "  - 90th: $(jq -r '.latency_percentiles["90"]' performance-results/backend-tests.json)" >> performance-report.md
+          echo "  - 99th: $(jq -r '.latency_percentiles["99"]' performance-results/backend-tests.json)" >> performance-report.md
           echo "" >> performance-report.md
           
           echo "### Frontend Metrics" >> performance-report.md
           echo "- **Install Time:** $(echo "${{ steps.frontend-build.outputs.frontend_install_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **Install Max Memory:** $(numfmt --to=iec ${{ steps.frontend-build.outputs.frontend_install_max_mem_kb }}K)" >> performance-report.md
+          echo "- **Install CPU Usage:** ${{ steps.frontend-build.outputs.frontend_install_cpu_percent }}%" >> performance-report.md
           echo "- **Build Time:** $(echo "${{ steps.frontend-build.outputs.frontend_build_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
-          echo "- **Bundle Size:** $(numfmt --to=iec ${{ steps.frontend-build.outputs.frontend_total_size }})" >> performance-report.md
-          echo "- **JS Size:** $(numfmt --to=iec ${{ steps.frontend-build.outputs.frontend_js_size }})" >> performance-report.md
-          echo "- **CSS Size:** $(numfmt --to=iec ${{ steps.frontend-build.outputs.frontend_css_size }})" >> performance-report.md
-          echo "- **File Count:** ${{ steps.frontend-build.outputs.frontend_file_count }}" >> performance-report.md
+          echo "- **Build Max Memory:** $(numfmt --to=iec ${{ steps.frontend-build.outputs.frontend_build_max_mem_kb }}K)" >> performance-report.md
+          echo "- **Build CPU Usage:** ${{ steps.frontend-build.outputs.frontend_build_cpu_percent }}%" >> performance-report.md
           echo "- **TypeScript Compilation:** $(echo "${{ steps.frontend-analysis.outputs.frontend_tsc_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **TypeScript Max Memory:** $(numfmt --to=iec ${{ steps.frontend-analysis.outputs.frontend_tsc_max_mem_kb }}K)" >> performance-report.md
+          echo "- **TypeScript CPU Usage:** ${{ steps.frontend-analysis.outputs.frontend_tsc_cpu_percent }}%" >> performance-report.md
           echo "- **ESLint:** $(echo "${{ steps.frontend-analysis.outputs.frontend_eslint_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **ESLint Max Memory:** $(numfmt --to=iec ${{ steps.frontend-analysis.outputs.frontend_eslint_max_mem_kb }}K)" >> performance-report.md
+          echo "- **ESLint CPU Usage:** ${{ steps.frontend-analysis.outputs.frontend_eslint_cpu_percent }}%" >> performance-report.md
           echo "" >> performance-report.md
           
           echo "### E2E Metrics" >> performance-report.md
