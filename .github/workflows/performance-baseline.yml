@@ -70,21 +70,23 @@ jobs:
         run: |
           echo "Starting backend build performance measurement..."
           
-          # Measure Gradle build time
+          # Measure backend build with resource usage
           start_time=$(date +%s.%N)
-          ./gradlew clean classes jar bootJar --no-daemon --parallel
+          /usr/bin/time -v ./gradlew clean classes jar bootJar --no-daemon --parallel 2> backend_build_time.txt
           end_time=$(date +%s.%N)
           build_time=$(echo "$end_time - $start_time" | bc -l)
           
-          # Measure build size
-          jar_size=$(stat -c%s "backend/app/build/libs/tolgee.jar" 2>/dev/null || echo "0")
-          
-          # Measure memory usage during build
-          memory_usage=$(free -m | awk 'NR==2{printf "%.2f", $3*100/$2}')
+          # Extract max memory and CPU usage from /usr/bin/time output
+          max_mem=$(grep "Maximum resident set size" backend_build_time.txt | awk '{print $6}')
+          cpu_percent=$(grep "Percent of CPU this job got" backend_build_time.txt | awk '{print $8}')
+          user_time=$(grep "User time (seconds)" backend_build_time.txt | awk '{print $5}')
+          sys_time=$(grep "System time (seconds)" backend_build_time.txt | awk '{print $5}')
           
           echo "backend_build_time=$build_time" >> $GITHUB_OUTPUT
-          echo "backend_jar_size=$jar_size" >> $GITHUB_OUTPUT
-          echo "backend_memory_usage=$memory_usage" >> $GITHUB_OUTPUT
+          echo "backend_build_max_mem_kb=$max_mem" >> $GITHUB_OUTPUT
+          echo "backend_build_cpu_percent=$cpu_percent" >> $GITHUB_OUTPUT
+          echo "backend_build_user_time=$user_time" >> $GITHUB_OUTPUT
+          echo "backend_build_sys_time=$sys_time" >> $GITHUB_OUTPUT
           
           # Save detailed metrics
           cat > performance-results/backend-build.json << EOF
@@ -94,8 +96,10 @@ jobs:
             "branch": "${{ github.ref_name }}",
             "metrics": {
               "build_time_seconds": $build_time,
-              "jar_size_bytes": $jar_size,
-              "memory_usage_percent": $memory_usage
+              "max_memory_kb": $max_mem,
+              "cpu_percent": $cpu_percent,
+              "user_time_seconds": $user_time,
+              "sys_time_seconds": $sys_time
             }
           }
           EOF
@@ -121,26 +125,43 @@ jobs:
           # Initialize JSON array for test results
           echo '[]' > performance-results/test-results-temp.json
           total_test_time=0
+          all_latencies=()
           
           for test_suite in "${test_suites[@]}"; do
             echo "Running $test_suite..."
             start_time=$(date +%s.%N)
-            ./gradlew $test_suite --no-daemon --parallel
+            /usr/bin/time -v ./gradlew $test_suite --no-daemon --parallel 2> backend_test_time.txt
             end_time=$(date +%s.%N)
             test_time=$(echo "$end_time - $start_time" | bc -l)
             total_test_time=$(echo "$total_test_time + $test_time" | bc -l)
             
-            # Extract test count and results
-            test_output=$(./gradlew $test_suite --no-daemon --parallel 2>&1 | grep -E "(tests|passed|failed|skipped)" | tail -1 || echo "No test output found")
+            # Extract max memory and CPU usage
+            max_mem=$(grep "Maximum resident set size" backend_test_time.txt | awk '{print $6}')
+            cpu_percent=$(grep "Percent of CPU this job got" backend_test_time.txt | awk '{print $8}')
+            user_time=$(grep "User time (seconds)" backend_test_time.txt | awk '{print $5}')
+            sys_time=$(grep "System time (seconds)" backend_test_time.txt | awk '{print $5}')
             
-            # Add test result to JSON array
-            jq --arg suite "$test_suite" --arg time "$test_time" --arg output "$test_output" \
-               '. += [{"suite": $suite, "time": $time, "output": $output}]' \
+            # Add test_time to all_latencies array
+            all_latencies+=("$test_time")
+            
+            jq --arg suite "$test_suite" --arg time "$test_time" --arg max_mem "$max_mem" --arg cpu_percent "$cpu_percent" --arg user_time "$user_time" --arg sys_time "$sys_time" \
+               '. += [{"suite": $suite, "time": $time, "max_memory_kb": $max_mem, "cpu_percent": $cpu_percent, "user_time_seconds": $user_time, "sys_time_seconds": $sys_time}]' \
                performance-results/test-results-temp.json > performance-results/test-results-temp2.json
             mv performance-results/test-results-temp2.json performance-results/test-results-temp.json
           done
           
-          # Read the final JSON and set output
+          # Calculate latency percentiles
+          percentiles=(50 90 99)
+          sorted_latencies=($(printf '%s\n' "${all_latencies[@]}" | sort -n))
+          count=${#sorted_latencies[@]}
+          latency_percentiles="{}"
+          for p in "${percentiles[@]}"; do
+            idx=$(( (count * p + 99) / 100 - 1 ))
+            if [ $idx -lt 0 ]; then idx=0; fi
+            val=${sorted_latencies[$idx]}
+            latency_percentiles=$(echo $latency_percentiles | jq --arg p "$p" --arg v "$val" '. + {($p): $v}')
+          done
+          
           test_results=$(cat performance-results/test-results-temp.json)
           echo "backend_test_results<<EOF" >> $GITHUB_OUTPUT
           echo "$test_results" >> $GITHUB_OUTPUT
@@ -154,6 +175,7 @@ jobs:
             "commit": "${{ github.sha }}",
             "branch": "${{ github.ref_name }}",
             "total_test_time_seconds": $total_test_time,
+            "latency_percentiles": $latency_percentiles,
             "test_suites": $test_results
           }
           EOF
@@ -366,8 +388,10 @@ jobs:
             },
             "backend": {
               "build_time_seconds": ${{ steps.backend-build.outputs.backend_build_time }},
-              "jar_size_bytes": ${{ steps.backend-build.outputs.backend_jar_size }},
-              "memory_usage_percent": ${{ steps.backend-build.outputs.backend_memory_usage }},
+              "max_memory_kb": ${{ steps.backend-build.outputs.backend_build_max_mem_kb }},
+              "cpu_percent": ${{ steps.backend-build.outputs.backend_build_cpu_percent }},
+              "user_time_seconds": ${{ steps.backend-build.outputs.backend_build_user_time }},
+              "sys_time_seconds": ${{ steps.backend-build.outputs.backend_build_sys_time }},
               "total_test_time_seconds": $total_test_time
             },
             "frontend": {
@@ -417,8 +441,10 @@ jobs:
           
           echo "### Backend Metrics" >> performance-report.md
           echo "- **Build Time:** $(echo "${{ steps.backend-build.outputs.backend_build_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
-          echo "- **JAR Size:** $(numfmt --to=iec ${{ steps.backend-build.outputs.backend_jar_size }})" >> performance-report.md
-          echo "- **Memory Usage:** ${{ steps.backend-build.outputs.backend_memory_usage }}%" >> performance-report.md
+          echo "- **Max Memory:** $(numfmt --to=iec ${{ steps.backend-build.outputs.backend_build_max_mem_kb }}K)" >> performance-report.md
+          echo "- **CPU Usage:** ${{ steps.backend-build.outputs.backend_build_cpu_percent }}%" >> performance-report.md
+          echo "- **User Time:** $(echo "${{ steps.backend-build.outputs.backend_build_user_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
+          echo "- **System Time:** $(echo "${{ steps.backend-build.outputs.backend_build_sys_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "" >> performance-report.md
           
