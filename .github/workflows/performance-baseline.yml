@@ -77,10 +77,10 @@ jobs:
           build_time=$(echo "$end_time - $start_time" | bc -l)
           
           # Extract max memory and CPU usage from /usr/bin/time output
-          max_mem=$(grep "Maximum resident set size" backend_build_time.txt | awk '{print $6}')
-          cpu_percent=$(grep "Percent of CPU this job got" backend_build_time.txt | awk '{print $8}')
-          user_time=$(grep "User time (seconds)" backend_build_time.txt | awk '{print $5}')
-          sys_time=$(grep "System time (seconds)" backend_build_time.txt | awk '{print $5}')
+          max_mem=$(grep "Maximum resident set size" backend_build_time.txt | awk -F: '{print $2}' | xargs)
+          cpu_percent=$(grep "Percent of CPU this job got" backend_build_time.txt | awk -F: '{print $2}' | xargs)
+          user_time=$(grep "User time (seconds)" backend_build_time.txt | awk -F: '{print $2}' | xargs)
+          sys_time=$(grep "System time (seconds)" backend_build_time.txt | awk -F: '{print $2}' | xargs)
           
           echo "backend_build_time=$build_time" >> $GITHUB_OUTPUT
           echo "backend_build_max_mem_kb=$max_mem" >> $GITHUB_OUTPUT
@@ -136,10 +136,10 @@ jobs:
             total_test_time=$(echo "$total_test_time + $test_time" | bc -l)
             
             # Extract max memory and CPU usage
-            max_mem=$(grep "Maximum resident set size" backend_test_time.txt | awk '{print $6}')
-            cpu_percent=$(grep "Percent of CPU this job got" backend_test_time.txt | awk '{print $8}')
-            user_time=$(grep "User time (seconds)" backend_test_time.txt | awk '{print $5}')
-            sys_time=$(grep "System time (seconds)" backend_test_time.txt | awk '{print $5}')
+            max_mem=$(grep "Maximum resident set size" backend_test_time.txt | awk -F: '{print $2}' | xargs)
+            cpu_percent=$(grep "Percent of CPU this job got" backend_test_time.txt | awk -F: '{print $2}' | xargs)
+            user_time=$(grep "User time (seconds)" backend_test_time.txt | awk -F: '{print $2}' | xargs)
+            sys_time=$(grep "System time (seconds)" backend_test_time.txt | awk -F: '{print $2}' | xargs)
             
             # Add test_time to all_latencies array
             all_latencies+=("$test_time")
@@ -197,15 +197,15 @@ jobs:
           /usr/bin/time -v npm ci 2> frontend_install_time.txt
           end_time=$(date +%s.%N)
           install_time=$(echo "$end_time - $start_time" | bc -l)
-          install_max_mem=$(grep "Maximum resident set size" frontend_install_time.txt | awk '{print $6}')
-          install_cpu_percent=$(grep "Percent of CPU this job got" frontend_install_time.txt | awk '{print $8}')
+          install_max_mem=$(grep "Maximum resident set size" frontend_install_time.txt | awk -F: '{print $2}' | xargs)
+          install_cpu_percent=$(grep "Percent of CPU this job got" frontend_install_time.txt | awk -F: '{print $2}' | xargs)
           
           start_time=$(date +%s.%N)
           /usr/bin/time -v npm run build 2> frontend_build_time.txt
           end_time=$(date +%s.%N)
           build_time=$(echo "$end_time - $start_time" | bc -l)
-          build_max_mem=$(grep "Maximum resident set size" frontend_build_time.txt | awk '{print $6}')
-          build_cpu_percent=$(grep "Percent of CPU this job got" frontend_build_time.txt | awk '{print $8}')
+          build_max_mem=$(grep "Maximum resident set size" frontend_build_time.txt | awk -F: '{print $2}' | xargs)
+          build_cpu_percent=$(grep "Percent of CPU this job got" frontend_build_time.txt | awk -F: '{print $2}' | xargs)
           
           echo "frontend_install_time=$install_time" >> $GITHUB_OUTPUT
           echo "frontend_install_max_mem_kb=$install_max_mem" >> $GITHUB_OUTPUT
@@ -250,8 +250,8 @@ jobs:
             /usr/bin/time -v npm run tsc 2> tsc_time.txt
             end_time=$(date +%s.%N)
             tsc_time=$(echo "$end_time - $start_time" | bc -l)
-            tsc_max_mem=$(grep "Maximum resident set size" tsc_time.txt | awk '{print $6}')
-            tsc_cpu_percent=$(grep "Percent of CPU this job got" tsc_time.txt | awk '{print $8}')
+            tsc_max_mem=$(grep "Maximum resident set size" tsc_time.txt | awk -F: '{print $2}' | xargs)
+            tsc_cpu_percent=$(grep "Percent of CPU this job got" tsc_time.txt | awk -F: '{print $2}' | xargs)
           fi
           # ESLint
           if ! npm run --silent eslint >/dev/null 2>&1; then
@@ -264,8 +264,8 @@ jobs:
             /usr/bin/time -v npm run eslint 2> eslint_time.txt
             end_time=$(date +%s.%N)
             eslint_time=$(echo "$end_time - $start_time" | bc -l)
-            eslint_max_mem=$(grep "Maximum resident set size" eslint_time.txt | awk '{print $6}')
-            eslint_cpu_percent=$(grep "Percent of CPU this job got" eslint_time.txt | awk '{print $8}')
+            eslint_max_mem=$(grep "Maximum resident set size" eslint_time.txt | awk -F: '{print $2}' | xargs)
+            eslint_cpu_percent=$(grep "Percent of CPU this job got" eslint_time.txt | awk -F: '{print $2}' | xargs)
           fi
           echo "frontend_tsc_time=$tsc_time" >> $GITHUB_OUTPUT
           echo "frontend_tsc_max_mem_kb=$tsc_max_mem" >> $GITHUB_OUTPUT
@@ -444,10 +444,6 @@ jobs:
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Setup Time:** $(echo "${{ steps.performance-summary.outputs.total_setup_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Time:** $(echo "${{ steps.performance-summary.outputs.total_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
-          echo "- **Latency Percentiles (s):**" >> performance-report.md
-          echo "  - 50th: $(jq -r '.[0].latency_percentiles["50"]' performance-results/backend-tests.json)" >> performance-report.md
-          echo "  - 90th: $(jq -r '.[0].latency_percentiles["90"]' performance-results/backend-tests.json)" >> performance-report.md
-          echo "  - 99th: $(jq -r '.[0].latency_percentiles["99"]' performance-results/backend-tests.json)" >> performance-report.md
           echo "" >> performance-report.md
           
           echo "### Backend Metrics" >> performance-report.md
@@ -457,7 +453,7 @@ jobs:
           echo "- **User Time:** $(echo "${{ steps.backend-build.outputs.backend_build_user_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **System Time:** $(echo "${{ steps.backend-build.outputs.backend_build_sys_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
           echo "- **Total Test Time:** $(echo "${{ steps.backend-tests.outputs.backend_total_test_time }}" | bc -l | xargs printf "%.2f")s" >> performance-report.md
-          echo "- **Latency Percentiles (s):**" >> performance-report.md
+          echo "- **Latency Percentiles:**" >> performance-report.md
           echo "  - 50th: $(jq -r '.latency_percentiles["50"]' performance-results/backend-tests.json)" >> performance-report.md
           echo "  - 90th: $(jq -r '.latency_percentiles["90"]' performance-results/backend-tests.json)" >> performance-report.md
           echo "  - 99th: $(jq -r '.latency_percentiles["99"]' performance-results/backend-tests.json)" >> performance-report.md
