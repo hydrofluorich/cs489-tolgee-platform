@@ -190,6 +190,10 @@ subprojects {
     }
 }
 
+tasks.register("detektAll") {
+    dependsOn subprojects.collect { it.tasks.matching { it.name == "detekt" } }
+}
+
 subprojects {
     if (file("${project.projectDir}/src/main/kotlin").exists()) {
         apply plugin: "io.gitlab.arturbosch.detekt"
