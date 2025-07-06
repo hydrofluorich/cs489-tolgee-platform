@@ -21,14 +21,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check for TypeScript changes
+        id: ts_changes
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "run_codeql=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '\.ts$|\.tsx$'; then
+            echo "run_codeql=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_codeql=false" >> "$GITHUB_OUTPUT"
+          fi
+
+
       - name: Initialize CodeQL
+        if: steps.ts_changes.outputs.run_codeql == 'true'
         uses: github/codeql-action/init@v3
         with:
           languages: typescript
 
       - name: Perform CodeQL Analysis
+        if: steps.ts_changes.outputs.run_codeql == 'true'
         uses: github/codeql-action/analyze@v3
 
+        
   detekt:
     name: Detekt Analysis (Kotlin)
     runs-on: ubuntu-latest
@@ -43,11 +58,23 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Check for Kotlin changes
+        id: kotlin_changes
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "run_detekt=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -qE '\.kt$|\.kts$'; then
+            echo "run_detekt=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_detekt=false" >> "$GITHUB_OUTPUT"
+          fi
+      
       - name: Run Detekt
+        if: steps.kotlin_changes.outputs.run_detekt == 'true'
         run: ./gradlew detektAll --continue
 
       - name: Upload all Detekt HTML reports
-        if: always()
+        if: steps.kotlin_changes.outputs.run_detekt == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: detekt-report
