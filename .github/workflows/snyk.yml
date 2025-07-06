@@ -10,7 +10,7 @@ on:
 
 jobs:
   snyk:
-    name: Snyk Gradle Scan
+    name: Snyk Scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +24,6 @@ jobs:
         run: npm install -g snyk
       
       - name: Run Snyk on Gradle
-        run: snyk monitor --all-sub-projects
+        run: snyk monitor --all-projects
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
