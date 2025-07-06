@@ -1,0 +1,29 @@
+name: Snyk Scan
+
+on:
+  push:
+    branches: [main, test-snyk]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 5 * * 1'  # Every Monday
+
+jobs:
+  snyk:
+    name: Snyk Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Snyk CLI
+        run: npm install -g snyk
+      
+      - name: Run Snyk on Gradle
+        run: snyk monitor --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
