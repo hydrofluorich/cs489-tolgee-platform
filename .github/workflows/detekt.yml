@@ -1,0 +1,36 @@
+name: Detekt Scan
+
+on:
+  push:
+    branches: [main, test-codeql]
+    paths: ['**/*.kt', '**/*.kts']
+  pull_request:
+    branches: [main]
+    paths: ['**/*.kt', '**/*.kts']
+  schedule:
+    - cron: '0 4 * * 1'  # Weekly on Monday
+
+jobs:
+  detekt:
+    name: Detekt Analysis (Kotlin)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Run Detekt
+        run: ./gradlew detektAll --continue
+
+      - name: Upload all Detekt HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: detekt-report
+          path: '**/build/reports/detekt/*.html'
