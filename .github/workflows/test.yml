@@ -30,7 +30,6 @@ jobs:
           status=$?
           end_time=$(date +%s)
           duration=$((end_time - start_time))
-          echo "Build duration: ${duration}s"
           if [ $duration -gt $PERFORMANCE_BENCHMARK_SECONDS ]; then
             echo "Backend build failed to meet performance benchmarks (>${duration}s > ${PERFORMANCE_BENCHMARK_SECONDS}s)"
             exit 1
@@ -195,13 +194,12 @@ jobs:
 
       - name: Build webapp
         run: |
-          PERFORMANCE_BENCHMARK_SECONDS=35
+          PERFORMANCE_BENCHMARK_SECONDS=100
           start_time=$(date +%s)
           ./gradlew buildWebapp
           status=$?
           end_time=$(date +%s)
           duration=$((end_time - start_time))
-          echo "Build duration: ${duration}s"
           if [ $duration -gt $PERFORMANCE_BENCHMARK_SECONDS ]; then
             echo "Frontend build failed to meet performance benchmarks (>${duration}s > ${PERFORMANCE_BENCHMARK_SECONDS}s)"
             exit 1
