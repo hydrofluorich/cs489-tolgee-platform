@@ -18,13 +18,39 @@ jobs:
 
       - name: Measure backend build duration
         run: |
-          start_time=$(date +%s)
-          ./gradlew classes jar bootJar
-          status=$?
-          end_time=$(date +%s)
-          duration=$((end_time - start_time))
-          echo $duration > backend_build_duration.txt
-          exit $status
+          durations=()
+          for i in {1..10}; do
+            echo "Run $i..."
+            start_time=$(date +%s)
+            ./gradlew clean classes jar bootJar
+            status=$?
+            end_time=$(date +%s)
+            duration=$((end_time - start_time))
+            durations+=("$duration")
+            echo "Run $i duration: ${duration}s"
+            if [ $status -ne 0 ]; then
+              echo "Build failed on run $i"
+              exit $status
+            fi
+          done
+          min=${durations[0]}
+          max=${durations[0]}
+          sum=0
+          for d in "${durations[@]}"; do
+            (( d < min )) && min=$d
+            (( d > max )) && max=$d
+            sum=$((sum + d))
+          done
+          avg=$(echo "scale=2; $sum / 10" | bc)
+          {
+            echo "Backend build durations (seconds):"
+            for i in {1..10}; do
+              echo "  Run $i: ${durations[$((i-1))]}s"
+            done
+            echo "Min: ${min}s"
+            echo "Max: ${max}s"
+            echo "Avg: ${avg}s"
+          } > backend_build_duration.txt
 
       - name: Upload backend build duration report
         uses: actions/upload-artifact@v4
@@ -43,13 +69,39 @@ jobs:
 
       - name: Measure frontend build duration
         run: |
-          start_time=$(date +%s)
-          ./gradlew buildWebapp
-          status=$?
-          end_time=$(date +%s)
-          duration=$((end_time - start_time))
-          echo $duration > frontend_build_duration.txt
-          exit $status
+          durations=()
+          for i in {1..10}; do
+            echo "Run $i..."
+            start_time=$(date +%s)
+            ./gradlew clean buildWebapp
+            status=$?
+            end_time=$(date +%s)
+            duration=$((end_time - start_time))
+            durations+=("$duration")
+            echo "Run $i duration: ${duration}s"
+            if [ $status -ne 0 ]; then
+              echo "Build failed on run $i"
+              exit $status
+            fi
+          done
+          min=${durations[0]}
+          max=${durations[0]}
+          sum=0
+          for d in "${durations[@]}"; do
+            (( d < min )) && min=$d
+            (( d > max )) && max=$d
+            sum=$((sum + d))
+          done
+          avg=$(echo "scale=2; $sum / 10" | bc)
+          {
+            echo "Frontend build durations (seconds):"
+            for i in {1..10}; do
+              echo "  Run $i: ${durations[$((i-1))]}s"
+            done
+            echo "Min: ${min}s"
+            echo "Max: ${max}s"
+            echo "Avg: ${avg}s"
+          } > frontend_build_duration.txt
         env:
           TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
           TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
