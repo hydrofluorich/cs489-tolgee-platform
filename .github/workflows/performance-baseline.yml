@@ -33,7 +33,7 @@ jobs:
       - name: Upload backend build duration report
         uses: actions/upload-artifact@v4
         with:
-          name: backend_build_duration_reports
+          name: backend_build_duration_report_${{ matrix.run }}
           path: build_durations/
 
   frontend-build-baseline:
@@ -65,7 +65,7 @@ jobs:
       - name: Upload frontend build duration report
         uses: actions/upload-artifact@v4
         with:
-          name: frontend_build_duration_reports
+          name: frontend_build_duration_report_${{ matrix.run }}
           path: build_durations/
 
   aggregate-backend-build-durations:
@@ -76,7 +76,7 @@ jobs:
       - name: Download all backend build duration artifacts
         uses: actions/download-artifact@v4
         with:
-          name: backend_build_duration_reports
+          pattern: backend_build_duration_report_*
           path: build_durations
 
       - name: Aggregate durations into one file
@@ -97,7 +97,7 @@ jobs:
       - name: Download all frontend build duration artifacts
         uses: actions/download-artifact@v4
         with:
-          name: frontend_build_duration_reports
+          pattern: frontend_build_duration_report_*
           path: build_durations
 
       - name: Aggregate durations into one file
