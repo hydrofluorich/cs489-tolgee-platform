@@ -81,7 +81,7 @@ jobs:
 
       - name: Aggregate durations into one file
         run: |
-          cat build_durations/backend_build_duration_*.txt > backend_build_durations.txt
+          cat build_durations/backend_build_duration_report_*/backend_build_duration_*.txt > backend_build_durations.txt
 
       - name: Upload aggregated backend build durations
         uses: actions/upload-artifact@v4
@@ -102,7 +102,7 @@ jobs:
 
       - name: Aggregate durations into one file
         run: |
-          cat build_durations/frontend_build_duration_*.txt > frontend_build_durations.txt
+          cat build_durations/frontend_build_duration_report_*/frontend_build_duration_*.txt > frontend_build_durations.txt
 
       - name: Upload aggregated frontend build durations
         uses: actions/upload-artifact@v4
