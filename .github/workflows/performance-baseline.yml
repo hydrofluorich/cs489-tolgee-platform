@@ -26,6 +26,10 @@ jobs:
           duration=$((end_time - start_time))
           echo $duration > backend_build_duration_${{ matrix.run }}.txt
           exit $status
+      - name: Move backend build duration report
+        run: |
+          mkdir -p build_durations
+          mv backend_build_duration_${{ matrix.run }}.txt build_durations/backend_build_duration_${{ matrix.run }}.txt
       - name: Upload backend build duration report
         uses: actions/upload-artifact@v4
         with:
@@ -54,6 +58,10 @@ jobs:
         env:
           TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
           TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
+      - name: Move frontend build duration report
+        run: |
+          mkdir -p build_durations
+          mv frontend_build_duration_${{ matrix.run }}.txt build_durations/frontend_build_duration_${{ matrix.run }}.txt
       - name: Upload frontend build duration report
         uses: actions/upload-artifact@v4
         with:
