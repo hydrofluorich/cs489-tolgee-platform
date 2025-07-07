@@ -18,45 +18,29 @@ jobs:
 
       - name: Measure backend build duration
         run: |
-          durations=()
+          rm -f backend_build_durations.txt
           for i in {1..10}; do
-            echo "Run $i..."
+            echo "Run $i"
+            # Clean up any build and gradle cache
+            rm -rf backend/build
+            rm -rf ~/.gradle
             start_time=$(date +%s)
-            ./gradlew clean classes jar bootJar
+            ./gradlew classes jar bootJar --no-daemon
             status=$?
             end_time=$(date +%s)
             duration=$((end_time - start_time))
-            durations+=("$duration")
-            echo "Run $i duration: ${duration}s"
+            echo $duration >> backend_build_durations.txt
             if [ $status -ne 0 ]; then
-              echo "Build failed on run $i"
+              echo "Build failed on iteration $i"
               exit $status
             fi
           done
-          min=${durations[0]}
-          max=${durations[0]}
-          sum=0
-          for d in "${durations[@]}"; do
-            (( d < min )) && min=$d
-            (( d > max )) && max=$d
-            sum=$((sum + d))
-          done
-          avg=$(echo "scale=2; $sum / 10" | bc)
-          {
-            echo "Backend build durations (seconds):"
-            for i in {1..10}; do
-              echo "  Run $i: ${durations[$((i-1))]}s"
-            done
-            echo "Min: ${min}s"
-            echo "Max: ${max}s"
-            echo "Avg: ${avg}s"
-          } > backend_build_duration.txt
 
       - name: Upload backend build duration report
         uses: actions/upload-artifact@v4
         with:
-          name: backend_build_duration
-          path: backend_build_duration.txt
+          name: backend_build_durations
+          path: backend_build_durations.txt
 
   frontend-build-baseline:
     name: Frontend Build Baseline 🏗️
@@ -69,39 +53,22 @@ jobs:
 
       - name: Measure frontend build duration
         run: |
-          durations=()
+          rm -f frontend_build_durations.txt
           for i in {1..10}; do
-            echo "Run $i..."
+            echo "Run $i"
+            rm -rf webapp/build
+            rm -rf ~/.gradle
             start_time=$(date +%s)
-            ./gradlew clean buildWebapp
+            ./gradlew buildWebapp --no-daemon
             status=$?
             end_time=$(date +%s)
             duration=$((end_time - start_time))
-            durations+=("$duration")
-            echo "Run $i duration: ${duration}s"
+            echo $duration >> frontend_build_durations.txt
             if [ $status -ne 0 ]; then
-              echo "Build failed on run $i"
+              echo "Build failed on iteration $i"
               exit $status
             fi
           done
-          min=${durations[0]}
-          max=${durations[0]}
-          sum=0
-          for d in "${durations[@]}"; do
-            (( d < min )) && min=$d
-            (( d > max )) && max=$d
-            sum=$((sum + d))
-          done
-          avg=$(echo "scale=2; $sum / 10" | bc)
-          {
-            echo "Frontend build durations (seconds):"
-            for i in {1..10}; do
-              echo "  Run $i: ${durations[$((i-1))]}s"
-            done
-            echo "Min: ${min}s"
-            echo "Max: ${max}s"
-            echo "Avg: ${avg}s"
-          } > frontend_build_duration.txt
         env:
           TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
           TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
@@ -109,5 +76,5 @@ jobs:
       - name: Upload frontend build duration report
         uses: actions/upload-artifact@v4
         with:
-          name: frontend_build_duration
-          path: frontend_build_duration.txt
+          name: frontend_build_durations
+          path: frontend_build_durations.txt
