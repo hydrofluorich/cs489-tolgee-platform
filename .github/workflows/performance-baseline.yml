@@ -1,0 +1,61 @@
+name: Performance Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [heidi/performance-baselines-2]
+  pull_request:
+
+jobs:
+  backend-build-baseline:
+    name: Backend Build Baseline 🏗️
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+
+      - name: Measure backend build duration
+        run: |
+          start_time=$(date +%s)
+          ./gradlew classes jar bootJar
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          echo $duration > backend_build_duration.txt
+          exit $status
+
+      - name: Upload backend build duration report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend_build_duration
+          path: backend_build_duration.txt
+
+  frontend-build-baseline:
+    name: Frontend Build Baseline 🏗️
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+
+      - name: Measure frontend build duration
+        run: |
+          start_time=$(date +%s)
+          ./gradlew buildWebapp
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          echo $duration > frontend_build_duration.txt
+          exit $status
+        env:
+          TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
+          TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
+
+      - name: Upload frontend build duration report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend_build_duration
+          path: frontend_build_duration.txt
