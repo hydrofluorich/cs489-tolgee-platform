@@ -8,72 +8,95 @@ on:
 
 jobs:
   backend-build-baseline:
-    name: Backend Build Baseline 🏗️
+    name: Backend Build Baseline Run ${{ matrix.run }} 🏗️
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        run: [1,2,3,4,5,6,7,8,9,10]
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup environment
         uses: ./.github/actions/setup-env
-
       - name: Measure backend build duration
         run: |
-          rm -f backend_build_durations.txt
-          for i in {1..10}; do
-            echo "Run $i"
-            # Clean up any build and gradle cache
-            rm -rf backend/build
-            rm -rf ~/.gradle
-            start_time=$(date +%s)
-            ./gradlew classes jar bootJar --no-daemon
-            status=$?
-            end_time=$(date +%s)
-            duration=$((end_time - start_time))
-            echo $duration >> backend_build_durations.txt
-            if [ $status -ne 0 ]; then
-              echo "Build failed on iteration $i"
-              exit $status
-            fi
-          done
-
+          start_time=$(date +%s)
+          ./gradlew classes jar bootJar
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          echo $duration > backend_build_duration_${{ matrix.run }}.txt
+          exit $status
       - name: Upload backend build duration report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend_build_duration_${{ matrix.run }}
+          path: backend_build_duration_${{ matrix.run }}.txt
+
+  frontend-build-baseline:
+    name: Frontend Build Baseline Run ${{ matrix.run }} 🏗️
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        run: [1,2,3,4,5,6,7,8,9,10]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup environment
+        uses: ./.github/actions/setup-env
+      - name: Measure frontend build duration
+        run: |
+          start_time=$(date +%s)
+          ./gradlew buildWebapp
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          echo $duration > frontend_build_duration_${{ matrix.run }}.txt
+          exit $status
+        env:
+          TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
+          TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
+      - name: Upload frontend build duration report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend_build_duration_${{ matrix.run }}
+          path: frontend_build_duration_${{ matrix.run }}.txt
+
+  aggregate-backend-build-durations:
+    name: Aggregate Backend Build Durations
+    runs-on: ubuntu-24.04
+    needs: backend-build-baseline
+    steps:
+      - name: Download all backend build duration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: backend_build_duration_*
+          path: backend_durations
+
+      - name: Aggregate durations into one file
+        run: |
+          cat backend_durations/backend_build_duration_*.txt > backend_build_durations.txt
+
+      - name: Upload aggregated backend build durations
         uses: actions/upload-artifact@v4
         with:
           name: backend_build_durations
           path: backend_build_durations.txt
 
-  frontend-build-baseline:
-    name: Frontend Build Baseline 🏗️
+  aggregate-frontend-build-durations:
+    name: Aggregate Frontend Build Durations
     runs-on: ubuntu-24.04
+    needs: frontend-build-baseline
     steps:
-      - uses: actions/checkout@v4
+      - name: Download all frontend build duration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: frontend_build_duration_*
+          path: frontend_durations
 
-      - name: Setup environment
-        uses: ./.github/actions/setup-env
-
-      - name: Measure frontend build duration
+      - name: Aggregate durations into one file
         run: |
-          rm -f frontend_build_durations.txt
-          for i in {1..10}; do
-            echo "Run $i"
-            rm -rf webapp/build
-            rm -rf ~/.gradle
-            start_time=$(date +%s)
-            ./gradlew buildWebapp --no-daemon
-            status=$?
-            end_time=$(date +%s)
-            duration=$((end_time - start_time))
-            echo $duration >> frontend_build_durations.txt
-            if [ $status -ne 0 ]; then
-              echo "Build failed on iteration $i"
-              exit $status
-            fi
-          done
-        env:
-          TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
-          TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
+          cat frontend_durations/frontend_build_duration_*.txt > frontend_build_durations.txt
 
-      - name: Upload frontend build duration report
+      - name: Upload aggregated frontend build durations
         uses: actions/upload-artifact@v4
         with:
           name: frontend_build_durations
