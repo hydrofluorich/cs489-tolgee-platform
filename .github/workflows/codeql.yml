@@ -3,7 +3,6 @@ name: CodeQL Scan
 on:
   push:
     branches: [main, test-codeql]
-    paths: ['**/*.ts', '**/*.tsx']
   pull_request:
     branches: [main]
     paths: ['**/*.ts', '**/*.tsx']
@@ -30,3 +29,18 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+
+      - name: Find SARIF file
+        run: find . -name '*.sarif'
+      
+      - name: Copy SARIF into repo-local folder
+        run: |
+          mkdir -p codeql-output/results
+          cp ../results/javascript.sarif codeql-output/results/javascript.sarif
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-results
+          path: codeql-output/results/javascript.sarif
