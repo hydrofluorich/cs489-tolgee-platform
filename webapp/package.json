@@ -15,7 +15,7 @@
     "@mdx-js/rollup": "^3.0.0",
     "@mui/lab": "^5.0.0-alpha.75",
     "@mui/material": "^5.5.3",
-    "@mui/x-date-pickers": "^7.9.0",
+    "@mui/x-date-pickers": "^7.29.4",
     "@openreplay/tracker": "^3.5.4",
     "@sentry/browser": "^7.80.0",
     "@stomp/stompjs": "^6.1.2",
