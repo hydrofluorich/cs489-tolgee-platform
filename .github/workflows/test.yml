@@ -24,7 +24,7 @@ jobs:
       # See: https://github.com/spring-gradle-plugins/dependency-management-plugin/issues/370
       - name: Build backend
         run: |
-          PERFORMANCE_BENCHMARK_SECONDS=300
+          PERFORMANCE_BENCHMARK_SECONDS=260
           start_time=$(date +%s)
           ./gradlew classes jar bootJar
           status=$?
@@ -194,7 +194,7 @@ jobs:
 
       - name: Build webapp
         run: |
-          PERFORMANCE_BENCHMARK_SECONDS=100
+          PERFORMANCE_BENCHMARK_SECONDS=110
           start_time=$(date +%s)
           ./gradlew buildWebapp
           status=$?
