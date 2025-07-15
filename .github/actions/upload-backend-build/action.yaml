@@ -1,6 +1,11 @@
 name: Upload backend build
 description: Compress and upload backend build result to GitHub artifacts
 
+inputs:
+  artifact_name:
+    required: true
+    description: 'Name of the artifact to upload'
+
 runs:
   using: composite
   steps:
@@ -25,7 +30,7 @@ runs:
 
     - uses: actions/upload-artifact@v4
       with:
-        name: backend_${{ steps.set_time.outputs.datetime }}
+        name: ${{ inputs.artifact_name }}
         path: |
           ~/backend-api.tar.zst
           ~/backend-app.tar.zst

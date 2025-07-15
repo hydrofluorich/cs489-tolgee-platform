@@ -41,6 +41,8 @@ jobs:
 
       - name: Upload backend build result
         uses: ./.github/actions/upload-backend-build
+        with:
+          artifact_name: backend_${{ matrix.run }}
 
   backend-test:
     name: BT ‍🔎
