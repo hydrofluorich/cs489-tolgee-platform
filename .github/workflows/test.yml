@@ -8,8 +8,11 @@ on:
 
 jobs:
   backend-build:
-    name: Build backend 🏗️
+    name: Build backend ${{ matrix.run }} 🏗️
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        run: [1,2,3,4,5,6,7,8,9,10]
     steps:
       - uses: actions/checkout@v4
 
@@ -184,8 +187,11 @@ jobs:
             ./e2e/server.log
 
   frontend-build:
-    name: Build frontend 🏗️
+    name: Build frontend ${{ matrix.run }} 🏗️
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        run: [1,2,3,4,5,6,7,8,9,10]
     steps:
       - uses: actions/checkout@v4
 
