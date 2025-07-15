@@ -23,7 +23,18 @@ jobs:
       # It's very occasional, and doesn't seem to occur locally, but parallel being the issue is possible
       # See: https://github.com/spring-gradle-plugins/dependency-management-plugin/issues/370
       - name: Build backend
-        run: ./gradlew classes jar bootJar
+        run: |
+          PERFORMANCE_BENCHMARK_SECONDS=260
+          start_time=$(date +%s)
+          ./gradlew classes jar bootJar
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          if [ $duration -gt $PERFORMANCE_BENCHMARK_SECONDS ]; then
+            echo "Backend build failed to meet performance benchmarks (>${duration}s > ${PERFORMANCE_BENCHMARK_SECONDS}s)"
+            exit 1
+          fi
+          exit $status
 
       - name: Upload backend build result
         uses: ./.github/actions/upload-backend-build
@@ -182,7 +193,18 @@ jobs:
         uses: ./.github/actions/setup-env
 
       - name: Build webapp
-        run: ./gradlew buildWebapp
+        run: |
+          PERFORMANCE_BENCHMARK_SECONDS=110
+          start_time=$(date +%s)
+          ./gradlew buildWebapp
+          status=$?
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          if [ $duration -gt $PERFORMANCE_BENCHMARK_SECONDS ]; then
+            echo "Frontend build failed to meet performance benchmarks (>${duration}s > ${PERFORMANCE_BENCHMARK_SECONDS}s)"
+            exit 1
+          fi
+          exit $status
         env:
           TOLGEE_API_KEY: ${{secrets.TOLGEE_API_KEY}}
           TOLGEE_API_URL: ${{secrets.TOLGEE_API_URL}}
