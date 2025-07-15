@@ -29,6 +29,7 @@ jobs:
         run: |
           PERFORMANCE_BENCHMARK_SECONDS=260
           start_time=$(date +%s)
+          sleep 120
           ./gradlew classes jar bootJar
           status=$?
           end_time=$(date +%s)
@@ -204,6 +205,7 @@ jobs:
         run: |
           PERFORMANCE_BENCHMARK_SECONDS=110
           start_time=$(date +%s)
+          sleep 60
           ./gradlew buildWebapp
           status=$?
           end_time=$(date +%s)
