@@ -1,3 +1,31 @@
+## [3.123.16](https://github.com/tolgee/tolgee-platform/compare/v3.123.15...v3.123.16) (2025-07-08)
+
+
+### Bug Fixes
+
+* ImportFile issue: handle propely when empty string is passed as issue param value ([#3149](https://github.com/tolgee/tolgee-platform/issues/3149)) ([a60467d](https://github.com/tolgee/tolgee-platform/commit/a60467d22a71245047907c563e2d8b1fcb579b61))
+
+## [3.123.15](https://github.com/tolgee/tolgee-platform/compare/v3.123.14...v3.123.15) (2025-07-03)
+
+
+### Bug Fixes
+
+* add new banner about glossaries and ai playground ([#3161](https://github.com/tolgee/tolgee-platform/issues/3161)) ([96ac384](https://github.com/tolgee/tolgee-platform/commit/96ac3847e0de006148a9a53e4dbbb1507a0cd26f))
+
+## [3.123.14](https://github.com/tolgee/tolgee-platform/compare/v3.123.13...v3.123.14) (2025-07-02)
+
+
+### Bug Fixes
+
+* remove temperature argument to be compatible with newer models ([#3150](https://github.com/tolgee/tolgee-platform/issues/3150)) ([622eb47](https://github.com/tolgee/tolgee-platform/commit/622eb4755ad7afe0d90d3f4f21b2cce931bf5645))
+
+## [3.123.13](https://github.com/tolgee/tolgee-platform/compare/v3.123.12...v3.123.13) (2025-07-01)
+
+
+### Bug Fixes
+
+* ignore broken pipe exceptions ([#3156](https://github.com/tolgee/tolgee-platform/issues/3156)) ([ea4b53c](https://github.com/tolgee/tolgee-platform/commit/ea4b53c35f707218028a20eb04435cbad4246a7c))
+
 ## [3.123.12](https://github.com/tolgee/tolgee-platform/compare/v3.123.11...v3.123.12) (2025-06-27)
 
 
