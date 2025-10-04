@@ -1,4 +1,4 @@
-FROM postgres:13.21-alpine3.22
+FROM postgres:13.22-alpine3.22
 
 ENTRYPOINT []
 
